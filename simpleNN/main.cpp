@@ -1,7 +1,7 @@
 /*
  * MNIST Neural Network Trainer in C++
  * Architecture: 784 -> 128 -> 64 -> 10
- * Allman brace style as requested
+ * Allman style + EVERY for/if has curly braces + NO 'auto' + NO range-based for + NO size_t
  */
 
 #include <iostream>
@@ -48,7 +48,10 @@ MNISTData loadImages(const string& imgPath, const string& lblPath)
 {
     // Images
     ifstream imgFile(imgPath, ios::binary);
-    if (!imgFile) throw runtime_error("Cannot open " + imgPath);
+    if (!imgFile)
+    {
+        throw runtime_error("Cannot open " + imgPath);
+    }
 
     uint32_t magic, numImages, rows, cols;
     imgFile.read(reinterpret_cast<char*>(&magic), 4);
@@ -76,7 +79,10 @@ MNISTData loadImages(const string& imgPath, const string& lblPath)
 
     // Labels
     ifstream lblFile(lblPath, ios::binary);
-    if (!lblFile) throw runtime_error("Cannot open " + lblPath);
+    if (!lblFile)
+    {
+        throw runtime_error("Cannot open " + lblPath);
+    }
 
     uint32_t lMagic, numLabels;
     lblFile.read(reinterpret_cast<char*>(&lMagic), 4);
@@ -113,12 +119,17 @@ void softmax(vector<float>& v)
 {
     float maxVal = *max_element(v.begin(), v.end());
     float sum = 0.0f;
-    for (auto& x : v)
+
+    for (int i = 0; i < (int)v.size(); ++i)
     {
-        x = exp(x - maxVal);
-        sum += x;
+        v[i] = exp(v[i] - maxVal);
+        sum += v[i];
     }
-    for (auto& x : v) x /= sum;
+
+    for (int i = 0; i < (int)v.size(); ++i)
+    {
+        v[i] /= sum;
+    }
 }
 
 // ─── Layer ───────────────────────────────────────────────────────────────────
@@ -137,7 +148,11 @@ struct Layer
 
         float stddev = sqrt(2.0f / in);
         normal_distribution<float> dist(0.0f, stddev);
-        for (auto& w : W) w = dist(rng);
+
+        for (int i = 0; i < (int)W.size(); ++i)
+        {
+            W[i] = dist(rng);
+        }
     }
 
     void forward(const vector<float>& input, bool use_relu)
@@ -146,7 +161,10 @@ struct Layer
         {
             float sum = b[j];
             const float* row = &W[j * inSize];
-            for (int i = 0; i < inSize; ++i) sum += row[i] * input[i];
+            for (int i = 0; i < inSize; ++i)
+            {
+                sum += row[i] * input[i];
+            }
             z[j] = sum;
             a[j] = use_relu ? relu(sum) : sum;
         }
@@ -158,7 +176,10 @@ struct Layer
         {
             db[j] += delta[j];
             float* row = &dW[j * inSize];
-            for (int i = 0; i < inSize; ++i) row[i] += delta[j] * prevA[i];
+            for (int i = 0; i < inSize; ++i)
+            {
+                row[i] += delta[j] * prevA[i];
+            }
         }
     }
 
@@ -168,7 +189,10 @@ struct Layer
         for (int i = 0; i < inSize; ++i)
         {
             float sum = 0.0f;
-            for (int j = 0; j < outSize; ++j) sum += W[j * inSize + i] * delta[j];
+            for (int j = 0; j < outSize; ++j)
+            {
+                sum += W[j * inSize + i] * delta[j];
+            }
             prevDelta[i] = apply_relu_grad ? sum * reluGrad(prevZ[i]) : sum;
         }
         return prevDelta;
@@ -218,12 +242,14 @@ struct Network
     {
         vector<float> delta3(OUTPUT_SIZE);
         for (int j = 0; j < OUTPUT_SIZE; ++j)
+        {
             delta3[j] = probs[j] - (j == label ? 1.0f : 0.0f);
+        }
 
         l3.accumulateGrads(delta3, l2.a);
-        auto delta2 = l3.backprop(delta3, l2.z, true);
+        vector<float> delta2 = l3.backprop(delta3, l2.z, true);
         l2.accumulateGrads(delta2, l1.a);
-        auto delta1 = l2.backprop(delta2, l1.z, true);
+        vector<float> delta1 = l2.backprop(delta2, l1.z, true);
         l1.accumulateGrads(delta1, x);
 
         return -log(max(probs[label], 1e-9f));
@@ -238,7 +264,7 @@ struct Network
 
     int predict(const vector<float>& x)
     {
-        auto probs = forward(x);
+        vector<float> probs = forward(x);
         return static_cast<int>(max_element(probs.begin(), probs.end()) - probs.begin());
     }
 };
@@ -246,7 +272,7 @@ struct Network
 // ─── Main ────────────────────────────────────────────────────────────────────
 int main()
 {
-    cout << "=== MNIST Trainer (Allman Style) ===\n\n";
+    cout << "=== MNIST Trainer (Allman Style + Full Braces + No auto + No range-based for + No size_t) ===\n\n";
 
     MNISTData train, test;
     try
@@ -273,7 +299,7 @@ int main()
 
     for (int epoch = 1; epoch <= EPOCHS; ++epoch)
     {
-        auto t0 = chrono::steady_clock::now();
+        chrono::steady_clock::time_point t0 = chrono::steady_clock::now();
         shuffle(indices.begin(), indices.end(), rng);
 
         float epochLoss = 0.0f;
@@ -285,7 +311,7 @@ int main()
             for (int k = 0; k < BATCH_SIZE; ++k)
             {
                 int idx = indices[b * BATCH_SIZE + k];
-                auto probs = net.forward(train.images[idx]);
+                vector<float> probs = net.forward(train.images[idx]);
                 batchLoss += net.backward(train.images[idx], train.labels[idx], probs);
             }
             float lr = LEARNING_RATE * pow(0.5f, (epoch-1)/5);
@@ -293,12 +319,18 @@ int main()
             epochLoss += batchLoss / BATCH_SIZE;
         }
 
-        auto t1 = chrono::steady_clock::now();
+        chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
         double elapsed = chrono::duration<double>(t1 - t0).count();
 
+        // Test accuracy
         int correct = 0;
-        for (size_t i = 0; i < test.images.size(); ++i)
-            if (net.predict(test.images[i]) == test.labels[i]) ++correct;
+        for (int i = 0; i < (int)test.images.size(); ++i)
+        {
+            if (net.predict(test.images[i]) == test.labels[i])
+            {
+                ++correct;
+            }
+        }
 
         cout << "Epoch " << setw(2) << epoch << "/" << EPOCHS
              << "  loss: " << fixed << setprecision(4) << epochLoss/numBatches
